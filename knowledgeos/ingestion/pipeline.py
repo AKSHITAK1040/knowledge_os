@@ -154,14 +154,102 @@ class IngestionPipeline:
         return raw.decode("utf-8", errors="ignore"), ""
 
     def _read_pdf(self, path: Path) -> str:
+        """Extract text from a PDF file using multiple strategy fallbacks."""
+        # Strategy 1: pypdf (fastest, works for most text-based PDFs)
         try:
             from pypdf import PdfReader
-
             reader = PdfReader(str(path))
-            pages = [page.extract_text() or "" for page in reader.pages]
-            return "\n\n".join(p for p in pages if p.strip())
+            pages: list[str] = []
+            for page in reader.pages:
+                extracted = page.extract_text() or ""
+                # Filter out pages that are clearly binary garbage (mostly non-printable chars)
+                printable_ratio = sum(1 for c in extracted if c.isprintable()) / max(len(extracted), 1)
+                if extracted.strip() and printable_ratio > 0.7:
+                    pages.append(extracted.strip())
+            if pages:
+                return "\n\n".join(pages)
         except Exception:
-            return path.read_text(encoding="utf-8", errors="ignore")
+            pass
+
+        # Strategy 2: pdfminer (better for complex layouts)
+        try:
+            from pdfminer.high_level import extract_text as pdfminer_extract
+            text = pdfminer_extract(str(path))
+            if text and text.strip():
+                # Filter binary garbage
+                printable_ratio = sum(1 for c in text if c.isprintable()) / max(len(text), 1)
+                if printable_ratio > 0.7:
+                    return text.strip()
+        except Exception:
+            pass
+
+        # Strategy 3: pymupdf / fitz (most powerful, handles encrypted PDFs)
+        try:
+            import fitz  # type: ignore[import]
+            doc = fitz.open(str(path))
+            pages = []
+            for page in doc:
+                text = page.get_text("text")
+                if text and text.strip():
+                    pages.append(text.strip())
+            doc.close()
+            if pages:
+                return "\n\n".join(pages)
+        except Exception:
+            pass
+
+        return f"[PDF text extraction failed for '{path.name}'. The file may be scanned, image-based, or encrypted. Please convert to text or use a text-based PDF.]"
+
+    def _read_pdf_bytes(self, data: bytes, filename: str = "upload.pdf") -> str:
+        """Extract text from PDF bytes (used by Streamlit file uploader)."""
+        import io as _io
+
+        # Strategy 1: pypdf from bytes
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(_io.BytesIO(data))
+            pages: list[str] = []
+            for page in reader.pages:
+                extracted = page.extract_text() or ""
+                printable_ratio = sum(1 for c in extracted if c.isprintable()) / max(len(extracted), 1)
+                if extracted.strip() and printable_ratio > 0.7:
+                    pages.append(extracted.strip())
+            if pages:
+                return "\n\n".join(pages)
+        except Exception:
+            pass
+
+        # Strategy 2: pdfminer from bytes
+        try:
+            from pdfminer.high_level import extract_text_to_fp
+            from pdfminer.layout import LAParams
+            output = _io.StringIO()
+            extract_text_to_fp(_io.BytesIO(data), output, laparams=LAParams())
+            text = output.getvalue()
+            if text and text.strip():
+                printable_ratio = sum(1 for c in text if c.isprintable()) / max(len(text), 1)
+                if printable_ratio > 0.7:
+                    return text.strip()
+        except Exception:
+            pass
+
+        # Strategy 3: pymupdf from bytes
+        try:
+            import fitz  # type: ignore[import]
+            doc = fitz.open(stream=data, filetype="pdf")
+            pages = []
+            for page in doc:
+                text = page.get_text("text")
+                if text and text.strip():
+                    pages.append(text.strip())
+            doc.close()
+            if pages:
+                return "\n\n".join(pages)
+        except Exception:
+            pass
+
+        return f"[PDF text extraction failed for '{filename}'. The file may be scanned or image-based.]"
+
 
     def _read_docx(self, path: Path) -> str:
         try:

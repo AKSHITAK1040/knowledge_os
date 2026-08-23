@@ -206,11 +206,42 @@ with tab2:
         )
         if uploaded_files and st.button("Ingest Uploaded Files", type="primary"):
             for f in uploaded_files:
-                temp_path = Path(".knowledgeos/uploads") / f.name
-                temp_path.parent.mkdir(parents=True, exist_ok=True)
-                temp_path.write_bytes(f.read())
-                report = ingestion.ingest_file(temp_path)
-                st.success(f"Ingested '{f.name}': {report.chunks_created} semantic chunks created!")
+                file_bytes = f.read()
+                suffix = Path(f.name).suffix.lower()
+
+                with st.spinner(f"Processing '{f.name}'..."):
+                    try:
+                        if suffix == ".pdf":
+                            # Use the bytes-aware PDF extractor
+                            text = ingestion._read_pdf_bytes(file_bytes, filename=f.name)
+                            if text.startswith("[PDF text extraction failed"):
+                                st.error(f"'{f.name}': {text}")
+                                continue
+                        elif suffix == ".docx":
+                            import io as _io
+                            temp_path = Path(".knowledgeos/uploads") / f.name
+                            temp_path.parent.mkdir(parents=True, exist_ok=True)
+                            temp_path.write_bytes(file_bytes)
+                            text = ingestion._read_docx(temp_path)
+                        elif suffix == ".csv":
+                            import io as _io
+                            temp_path = Path(".knowledgeos/uploads") / f.name
+                            temp_path.parent.mkdir(parents=True, exist_ok=True)
+                            temp_path.write_bytes(file_bytes)
+                            text = ingestion._read_csv(temp_path)
+                        else:
+                            # md, txt, json — safe to decode as utf-8
+                            text = file_bytes.decode("utf-8", errors="ignore")
+
+                        if not text or not text.strip():
+                            st.warning(f"No readable text found in '{f.name}'. The file may be empty or image-only.")
+                            continue
+
+                        report = ingestion.ingest_text(text, title=f.name)
+                        st.success(f"✅ Ingested '{f.name}': **{report.chunks_created} semantic chunks** created and indexed!")
+                    except Exception as exc:
+                        st.error(f"Failed to ingest '{f.name}': {exc}")
+
 
     elif ingest_type == "Web URL Scraper":
         url_input = st.text_input("Enter URL to scrape and index", value="https://en.wikipedia.org/wiki/Information_retrieval")
