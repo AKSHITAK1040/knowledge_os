@@ -1,13 +1,14 @@
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
-from pathlib import Path
-from typing import Any
-from urllib.parse import urlparse
-from urllib.request import urlopen
 import io
 import json
+from pathlib import Path
+from typing import Any, Sequence
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
 
 from ..retrieval.hybrid import HybridRetriever
 from ..types import KnowledgeChunk, SourceKind
@@ -18,9 +19,21 @@ class _HTMLTextExtractor(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
         self.parts: list[str] = []
+        self.title: str = ""
+        self._capture_title = False
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag.lower() == "title":
+            self._capture_title = True
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag.lower() == "title":
+            self._capture_title = False
 
     def handle_data(self, data: str) -> None:
-        if data.strip():
+        if self._capture_title:
+            self.title += data.strip()
+        elif data.strip():
             self.parts.append(data.strip())
 
 
@@ -29,61 +42,124 @@ class IngestionReport:
     source: str
     chunks_created: int
     metadata: dict[str, Any] = field(default_factory=dict)
+    chunk_ids: list[str] = field(default_factory=list)
 
 
 class IngestionPipeline:
+    """Enterprise Document Ingestion Pipeline supporting Text, Markdown, PDF, DOCX, CSV, JSON, and Web."""
+
     def __init__(self, retriever: HybridRetriever) -> None:
         self.retriever = retriever
 
-    def ingest_text(self, text: str, *, title: str, source_kind: SourceKind = SourceKind.INTERNAL, metadata: dict[str, Any] | None = None) -> IngestionReport:
+    def ingest_text(
+        self,
+        text: str,
+        *,
+        title: str,
+        source_kind: SourceKind = SourceKind.INTERNAL,
+        metadata: dict[str, Any] | None = None,
+    ) -> IngestionReport:
         metadata = metadata or {}
-        chunk_count = 0
-        for index, piece in enumerate(chunk_text(text)):
-            self.retriever.add_chunk(piece, title=title, source_kind=source_kind, metadata=merge_metadata(metadata, {"chunk_index": index}))
-            chunk_count += 1
-        return IngestionReport(source=title, chunks_created=chunk_count, metadata=metadata)
+        chunk_pieces = chunk_text(text, max_tokens=180, overlap=30)
+        chunk_ids: list[str] = []
 
-    def ingest_file(self, path: str | Path) -> IngestionReport:
+        for index, piece in enumerate(chunk_pieces):
+            chunk = self.retriever.add_chunk(
+                piece,
+                title=title,
+                url=metadata.get("url"),
+                source_kind=source_kind,
+                metadata=merge_metadata(metadata, {"chunk_index": index, "total_chunks": len(chunk_pieces)}),
+            )
+            chunk_ids.append(chunk.id)
+
+        return IngestionReport(
+            source=title,
+            chunks_created=len(chunk_pieces),
+            metadata=metadata,
+            chunk_ids=chunk_ids,
+        )
+
+    def ingest_file(self, path: str | Path, metadata: dict[str, Any] | None = None) -> IngestionReport:
         file_path = Path(path)
+        if not file_path.exists():
+            raise FileNotFoundError(f"File not found: {file_path}")
+
+        meta = metadata or {}
         suffix = file_path.suffix.lower()
+        title = file_path.name
+
         if suffix == ".docx":
             text = self._read_docx(file_path)
         elif suffix == ".pdf":
             text = self._read_pdf(file_path)
+        elif suffix == ".csv":
+            text = self._read_csv(file_path)
+        elif suffix == ".json":
+            text = self._read_json(file_path)
         else:
             text = file_path.read_text(encoding="utf-8", errors="ignore")
-        return self.ingest_text(text, title=file_path.name, metadata={"path": str(file_path), "suffix": suffix})
 
-    def ingest_url(self, url: str) -> IngestionReport:
-        with urlopen(url, timeout=20) as response:
+        return self.ingest_text(
+            text,
+            title=title,
+            source_kind=SourceKind.INTERNAL,
+            metadata=merge_metadata(meta, {"path": str(file_path), "suffix": suffix, "size_bytes": file_path.stat().st_size}),
+        )
+
+    def ingest_url(self, url: str, metadata: dict[str, Any] | None = None) -> IngestionReport:
+        meta = metadata or {}
+        req = Request(url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) KnowledgeOS/0.1"})
+        with urlopen(req, timeout=20) as response:
             content_type = response.headers.get("Content-Type", "")
             raw = response.read()
-        text = self._extract_text_from_web(raw, content_type)
+
+        extracted_text, page_title = self._extract_text_from_web(raw, content_type)
         parsed = urlparse(url)
-        return self.ingest_text(text, title=parsed.netloc + parsed.path, source_kind=SourceKind.WEB, metadata={"url": url, "content_type": content_type})
+        title = page_title or f"{parsed.netloc}{parsed.path}"
+
+        return self.ingest_text(
+            extracted_text,
+            title=title,
+            source_kind=SourceKind.WEB,
+            metadata=merge_metadata(meta, {"url": url, "content_type": content_type, "domain": parsed.netloc}),
+        )
+
+    def ingest_batch(self, items: Sequence[dict[str, Any]]) -> list[IngestionReport]:
+        reports = []
+        for item in items:
+            reports.append(self.ingest_payload(item))
+        return reports
 
     def ingest_payload(self, payload: dict[str, Any]) -> IngestionReport:
-        if "text" in payload:
-            return self.ingest_text(payload["text"], title=payload.get("title", "untitled"), metadata=payload.get("metadata", {}))
-        if "path" in payload:
-            return self.ingest_file(payload["path"])
-        if "url" in payload:
-            return self.ingest_url(payload["url"])
-        raise ValueError("Payload must contain text, path, or url")
+        meta = payload.get("metadata", {})
+        if "text" in payload and payload["text"]:
+            return self.ingest_text(
+                payload["text"],
+                title=payload.get("title", "untitled_document"),
+                source_kind=SourceKind(payload.get("source_kind", SourceKind.INTERNAL.value)),
+                metadata=meta,
+            )
+        if "path" in payload and payload["path"]:
+            return self.ingest_file(payload["path"], metadata=meta)
+        if "url" in payload and payload["url"]:
+            return self.ingest_url(payload["url"], metadata=meta)
+        raise ValueError("Payload must specify 'text', 'path', or 'url'")
 
-    def _extract_text_from_web(self, raw: bytes, content_type: str) -> str:
-        if "html" in content_type.lower():
+    def _extract_text_from_web(self, raw: bytes, content_type: str) -> tuple[str, str]:
+        if "html" in content_type.lower() or b"<html" in raw[:500].lower():
             parser = _HTMLTextExtractor()
             parser.feed(raw.decode("utf-8", errors="ignore"))
-            return " ".join(parser.parts)
-        return raw.decode("utf-8", errors="ignore")
+            return " ".join(parser.parts), parser.title
+        return raw.decode("utf-8", errors="ignore"), ""
 
     def _read_pdf(self, path: Path) -> str:
         try:
             from pypdf import PdfReader
 
             reader = PdfReader(str(path))
-            return "\n".join(page.extract_text() or "" for page in reader.pages)
+            pages = [page.extract_text() or "" for page in reader.pages]
+            return "\n\n".join(p for p in pages if p.strip())
         except Exception:
             return path.read_text(encoding="utf-8", errors="ignore")
 
@@ -91,8 +167,24 @@ class IngestionPipeline:
         try:
             from docx import Document
 
-            document = Document(str(path))
-            return "\n".join(paragraph.text for paragraph in document.paragraphs)
+            doc = Document(str(path))
+            return "\n\n".join(p.text for p in doc.paragraphs if p.text.strip())
         except Exception:
             return path.read_text(encoding="utf-8", errors="ignore")
 
+    def _read_csv(self, path: Path) -> str:
+        lines = []
+        with open(path, mode="r", encoding="utf-8", errors="ignore") as f:
+            reader = csv.reader(f)
+            headers = next(reader, None)
+            if headers:
+                for row in reader:
+                    row_parts = [f"{h}: {v}" for h, v in zip(headers, row) if v]
+                    lines.append(", ".join(row_parts))
+        return "\n".join(lines) if lines else path.read_text(encoding="utf-8", errors="ignore")
+
+    def _read_json(self, path: Path) -> str:
+        data = json.loads(path.read_text(encoding="utf-8", errors="ignore"))
+        if isinstance(data, list):
+            return "\n\n".join(json.dumps(item) if isinstance(item, dict) else str(item) for item in data)
+        return json.dumps(data, indent=2)

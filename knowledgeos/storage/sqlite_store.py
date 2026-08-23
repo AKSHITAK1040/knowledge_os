@@ -2,15 +2,17 @@ from __future__ import annotations
 
 from dataclasses import asdict
 import json
-import sqlite3
 from pathlib import Path
+import sqlite3
 from threading import Lock
 from typing import Any
 
-from ..types import MemoryItem
+from ..types import Citation, KnowledgeChunk, MemoryItem, SourceKind, TraceEvent
 
 
 class KnowledgeOSSQLiteStore:
+    """Production-grade local SQLite persistence store for traces, metrics, memories, and chunks."""
+
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -20,6 +22,8 @@ class KnowledgeOSSQLiteStore:
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, check_same_thread=False)
         connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA journal_mode=WAL;")
+        connection.execute("PRAGMA synchronous=NORMAL;")
         return connection
 
     def _initialize(self) -> None:
@@ -34,6 +38,7 @@ class KnowledgeOSSQLiteStore:
                     event_type TEXT NOT NULL,
                     message TEXT NOT NULL,
                     timestamp REAL NOT NULL,
+                    duration_ms REAL DEFAULT 0.0,
                     metadata TEXT NOT NULL
                 )
                 """
@@ -41,6 +46,7 @@ class KnowledgeOSSQLiteStore:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS metrics (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT NOT NULL,
                     timestamp REAL NOT NULL,
                     user_id TEXT,
@@ -67,14 +73,33 @@ class KnowledgeOSSQLiteStore:
                 )
                 """
             )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS chunks (
+                    id TEXT PRIMARY KEY,
+                    text TEXT NOT NULL,
+                    source_kind TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    url TEXT,
+                    metadata TEXT NOT NULL,
+                    embedding TEXT NOT NULL,
+                    created_at REAL NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_traces_trace_id ON traces (trace_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_traces_timestamp ON traces (timestamp DESC);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON metrics (timestamp DESC);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_user ON memories (user_id);")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_memories_session ON memories (session_id);")
 
-    def append_trace(self, event: Any) -> None:
+    def append_trace(self, event: TraceEvent) -> None:
         with self._lock, self._connect() as conn:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO traces
-                (event_id, trace_id, parent_event_id, agent_name, event_type, message, timestamp, metadata)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (event_id, trace_id, parent_event_id, agent_name, event_type, message, timestamp, duration_ms, metadata)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     event.event_id,
@@ -84,6 +109,7 @@ class KnowledgeOSSQLiteStore:
                     event.event_type,
                     event.message,
                     event.timestamp,
+                    event.duration_ms,
                     json.dumps(event.metadata),
                 ),
             )
@@ -128,7 +154,6 @@ class KnowledgeOSSQLiteStore:
 
     def load_metrics(self, limit: int = 1000) -> list[Any]:
         from ..analytics.service import MetricsEvent
-        from ..types import Citation, SourceKind
 
         events = []
         for row in self.list_metrics(limit=limit):
@@ -179,6 +204,11 @@ class KnowledgeOSSQLiteStore:
                 ),
             )
 
+    def delete_memory(self, memory_id: str) -> bool:
+        with self._lock, self._connect() as conn:
+            cur = conn.execute("DELETE FROM memories WHERE id = ?", (memory_id,))
+            return cur.rowcount > 0
+
     def list_memories(self, user_id: str | None = None, session_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
         query = "SELECT * FROM memories"
         filters: list[str] = []
@@ -197,9 +227,7 @@ class KnowledgeOSSQLiteStore:
             rows = conn.execute(query, params).fetchall()
         return [dict(row) | {"payload": json.loads(row["payload"])} for row in rows]
 
-    def load_memories(self, user_id: str | None = None, session_id: str | None = None, limit: int = 100) -> list[Any]:
-        from ..types import MemoryItem
-
+    def load_memories(self, user_id: str | None = None, session_id: str | None = None, limit: int = 100) -> list[MemoryItem]:
         return [
             MemoryItem(
                 id=row["id"],
@@ -213,3 +241,59 @@ class KnowledgeOSSQLiteStore:
             )
             for row in self.list_memories(user_id=user_id, session_id=session_id, limit=limit)
         ]
+
+    def upsert_chunk(self, chunk: KnowledgeChunk, created_at: float | None = None) -> None:
+        import time
+
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                """
+                INSERT OR REPLACE INTO chunks
+                (id, text, source_kind, title, url, metadata, embedding, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    chunk.id,
+                    chunk.text,
+                    chunk.source_kind.value if hasattr(chunk.source_kind, "value") else str(chunk.source_kind),
+                    str(chunk.metadata.get("title", "untitled")),
+                    chunk.metadata.get("url"),
+                    json.dumps(chunk.metadata),
+                    json.dumps(chunk.embedding),
+                    created_at or time.time(),
+                ),
+            )
+
+    def load_chunks(self, limit: int = 5000) -> list[KnowledgeChunk]:
+        with self._lock, self._connect() as conn:
+            rows = conn.execute("SELECT * FROM chunks ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+        chunks = []
+        for row in rows:
+            chunks.append(
+                KnowledgeChunk(
+                    id=row["id"],
+                    text=row["text"],
+                    source_kind=SourceKind(row["source_kind"]),
+                    metadata=json.loads(row["metadata"]),
+                    embedding=json.loads(row["embedding"]),
+                )
+            )
+        return chunks
+
+    def count_chunks(self) -> int:
+        with self._lock, self._connect() as conn:
+            row = conn.execute("SELECT COUNT(*) as count FROM chunks").fetchone()
+            return row["count"] if row else 0
+
+    def stats(self) -> dict[str, int]:
+        with self._lock, self._connect() as conn:
+            trace_count = conn.execute("SELECT COUNT(*) as c FROM traces").fetchone()["c"]
+            metric_count = conn.execute("SELECT COUNT(*) as c FROM metrics").fetchone()["c"]
+            memory_count = conn.execute("SELECT COUNT(*) as c FROM memories").fetchone()["c"]
+            chunk_count = conn.execute("SELECT COUNT(*) as c FROM chunks").fetchone()["c"]
+        return {
+            "traces": trace_count,
+            "metrics": metric_count,
+            "memories": memory_count,
+            "chunks": chunk_count,
+        }

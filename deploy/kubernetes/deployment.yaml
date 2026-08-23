@@ -1,0 +1,120 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: knowledgeos
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: knowledgeos-config
+  namespace: knowledgeos
+data:
+  KNOWLEDGEOS_ENV: "production"
+  GROQ_MODEL: "openai/gpt-oss-120b"
+  GROQ_BASE_URL: "https://api.groq.com/openai/v1"
+  RATE_LIMIT_PER_MINUTE: "120"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: knowledgeos-secrets
+  namespace: knowledgeos
+type: Opaque
+stringData:
+  GROQ_API_KEY: "YOUR_GROQ_API_KEY"
+  KNOWLEDGEOS_API_KEY: "dev-key"
+---
+# KnowledgeOS FastAPI Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: knowledgeos-api
+  namespace: knowledgeos
+  labels:
+    app: knowledgeos-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: knowledgeos-api
+  template:
+    metadata:
+      labels:
+        app: knowledgeos-api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: api
+          image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/knowledgeos-api:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: knowledgeos-config
+            - secretRef:
+                name: knowledgeos-secrets
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+# Kubernetes Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: knowledgeos-api-svc
+  namespace: knowledgeos
+spec:
+  type: LoadBalancer
+  selector:
+    app: knowledgeos-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+---
+# Horizontal Pod Autoscaler (HPA) for MLOps Scaling
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: knowledgeos-api-hpa
+  namespace: knowledgeos
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: knowledgeos-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80

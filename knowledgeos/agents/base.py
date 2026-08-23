@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 import time
 from typing import Any
 
-from ..types import AgentOutcome, AgentStatus, ResearchState, TraceEvent
+from ..types import AgentOutcome, AgentStatus, Citation, ResearchState, TraceEvent
 
 
 @dataclass(slots=True)
@@ -22,7 +22,16 @@ class BaseAgent(ABC):
     def __init__(self) -> None:
         self._last_run_at = 0.0
 
-    def trace(self, state: ResearchState, event_type: str, message: str, *, metadata: dict[str, Any] | None = None, parent_event_id: str | None = None) -> TraceEvent:
+    def trace(
+        self,
+        state: ResearchState,
+        event_type: str,
+        message: str,
+        *,
+        metadata: dict[str, Any] | None = None,
+        duration_ms: float = 0.0,
+        parent_event_id: str | None = None,
+    ) -> TraceEvent:
         trace_id = state.artifacts.get("trace_id") or (state.trace[0].trace_id if state.trace else TraceEvent().trace_id)
         event = TraceEvent(
             trace_id=trace_id,
@@ -30,12 +39,23 @@ class BaseAgent(ABC):
             agent_name=self.name,
             event_type=event_type,
             message=message,
+            duration_ms=duration_ms,
             metadata=metadata or {},
         )
         state.trace.append(event)
         return event
 
-    def outcome(self, state: ResearchState, *, status: AgentStatus = AgentStatus.SUCCEEDED, confidence: float = 0.0, message: str = "", evidence=None, artifacts=None, error: str | None = None) -> AgentOutcome:
+    def outcome(
+        self,
+        state: ResearchState,
+        *,
+        status: AgentStatus = AgentStatus.SUCCEEDED,
+        confidence: float = 0.0,
+        message: str = "",
+        evidence: list[Citation] | None = None,
+        artifacts: dict[str, Any] | None = None,
+        error: str | None = None,
+    ) -> AgentOutcome:
         return AgentOutcome(
             agent_name=self.name,
             status=status,
@@ -48,8 +68,18 @@ class BaseAgent(ABC):
         )
 
     def run(self, state: ResearchState) -> AgentOutcome:
+        start = time.perf_counter()
         self._last_run_at = time.time()
-        return self._run(state)
+        try:
+            res = self._run(state)
+            duration_ms = round((time.perf_counter() - start) * 1000, 2)
+            self.trace(state, "step_complete", f"Agent '{self.name}' completed execution", duration_ms=duration_ms)
+            return res
+        except Exception as exc:
+            duration_ms = round((time.perf_counter() - start) * 1000, 2)
+            self.trace(state, "step_error", f"Agent '{self.name}' failed: {exc}", duration_ms=duration_ms, metadata={"error": str(exc)})
+            state.errors.append(f"{self.name}: {exc}")
+            return self.outcome(state, status=AgentStatus.FAILED, confidence=0.0, error=str(exc))
 
     @abstractmethod
     def _run(self, state: ResearchState) -> AgentOutcome:

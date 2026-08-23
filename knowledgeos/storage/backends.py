@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import time
 from threading import Lock
+import time
 from typing import Any
 
 from ..types import TraceEvent
@@ -32,17 +32,35 @@ class InMemoryVectorStore:
             self._items = [item for item in self._items if item[0] != key]
             self._items.append((key, deterministic_embedding(text), metadata or {}))
 
-    def search(self, query: str, top_k: int = 5) -> list[tuple[str, float, dict[str, Any]]]:
+    def search(
+        self,
+        query: str,
+        top_k: int = 5,
+        filters: dict[str, Any] | None = None,
+    ) -> list[tuple[str, float, dict[str, Any]]]:
         query_embedding = deterministic_embedding(query)
         with self._lock:
             items = list(self._items)
-        scored = [(key, cosine_similarity(query_embedding, embedding), metadata) for key, embedding, metadata in items]
-        scored.sort(key=lambda item: item[1], reverse=True)
-        return scored[:top_k]
+
+        candidates = []
+        for key, embedding, metadata in items:
+            if filters:
+                match = True
+                for f_k, f_v in filters.items():
+                    if metadata.get(f_k) != f_v:
+                        match = False
+                        break
+                if not match:
+                    continue
+            sim = cosine_similarity(query_embedding, embedding)
+            candidates.append((key, sim, metadata))
+
+        candidates.sort(key=lambda item: item[1], reverse=True)
+        return candidates[:top_k]
 
 
 class RedisCacheBackend:
-    """Adapter placeholder for Redis-backed caching."""
+    """In-memory cache with optional Redis DSN integration."""
 
     def __init__(self, dsn: str | None = None) -> None:
         self.dsn = dsn
@@ -64,6 +82,10 @@ class RedisCacheBackend:
         with self._lock:
             self._cache[key] = (time.time() + ttl_seconds, value)
 
+    def clear(self) -> None:
+        with self._lock:
+            self._cache.clear()
+
 
 class PostgresEventStore:
     """Adapter placeholder for Postgres event persistence."""
@@ -71,12 +93,15 @@ class PostgresEventStore:
     def __init__(self, dsn: str | None = None) -> None:
         self.dsn = dsn
         self._events: list[TraceEvent] = []
+        self._lock = Lock()
 
     def append(self, event: TraceEvent) -> None:
-        self._events.append(event)
+        with self._lock:
+            self._events.append(event)
 
     def query(self) -> list[TraceEvent]:
-        return list(self._events)
+        with self._lock:
+            return list(self._events)
 
 
 class MilvusVectorStore:
@@ -86,12 +111,16 @@ class MilvusVectorStore:
         self.uri = uri
         self.collection = collection
         self._items: dict[str, tuple[list[float], dict[str, Any]]] = {}
+        self._lock = Lock()
 
     def upsert(self, key: str, text: str, metadata: dict[str, Any] | None = None) -> None:
-        self._items[key] = (deterministic_embedding(text), metadata or {})
+        with self._lock:
+            self._items[key] = (deterministic_embedding(text), metadata or {})
 
     def search(self, query: str, top_k: int = 5) -> list[tuple[str, float, dict[str, Any]]]:
         query_embedding = deterministic_embedding(query)
-        scored = [(key, cosine_similarity(query_embedding, embedding), metadata) for key, (embedding, metadata) in self._items.items()]
+        with self._lock:
+            items = list(self._items.items())
+        scored = [(key, cosine_similarity(query_embedding, embedding), metadata) for key, (embedding, metadata) in items]
         scored.sort(key=lambda item: item[1], reverse=True)
         return scored[:top_k]

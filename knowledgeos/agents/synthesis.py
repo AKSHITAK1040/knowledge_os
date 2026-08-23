@@ -14,23 +14,52 @@ class SynthesisAgent(BaseAgent):
         self.llm = llm
 
     def _run(self, state: ResearchState) -> AgentOutcome:
+        citations = dedupe_citations(state.citations)
         evidence_lines = []
-        for citation in dedupe_citations(state.citations)[:8]:
-            evidence_lines.append(f"[{citation.title}] {citation.excerpt or ''}")
+        for citation in citations[:10]:
+            excerpt = citation.excerpt or ""
+            evidence_lines.append(f"[{citation.title}] {excerpt}")
+
         memory_lines = state.artifacts.get("memory_summary", "")
-        evaluation_notes = "\n".join(state.artifacts.get("evaluation_notes", []))
+        critique_notes = "\n".join(f"- {note}" for note in state.critique_notes)
+
         prompt = (
             f"Query: {state.request.query}\n"
-            f"Plan: {' | '.join(state.plan)}\n"
-            f"Evidence:\n" + "\n".join(evidence_lines) + "\n"
-            f"Memory:\n{memory_lines}\n"
-            f"Reflection notes:\n{evaluation_notes}\n"
-            "Write a grounded, cited response with clear source attribution."
+            f"Intent: {state.intent.value}\n"
+            f"Plan: {' | '.join(state.plan)}\n\n"
+            f"Evidence:\n" + ("\n".join(evidence_lines) if evidence_lines else "No direct evidence retrieved.") + "\n\n"
+            f"Memory:\n{memory_lines}\n\n"
+            f"Critique / Reflection Notes:\n{critique_notes}\n\n"
+            "Task: Synthesize an authoritative, highly grounded, and cited executive intelligence report. "
+            "Integrate inline citations [1], [2], etc. corresponding directly to the provided evidence sources."
         )
-        answer = self.llm.generate(prompt, metadata={"task": "synthesis"})
-        if not state.citations:
-            answer = f"{answer}\n\nNo citations were available, so this answer should be treated as provisional."
+
+        answer = self.llm.generate(
+            prompt,
+            metadata={
+                "task": "synthesis",
+                "intent": state.intent.value,
+                "retry_count": state.retry_count,
+                "notes": state.critique_notes,
+            },
+        )
+
+        if not citations and "No citations were available" not in answer:
+            answer = f"{answer}\n\n*Note: No citations were available, so this answer should be treated as provisional.*"
+
         state.draft = answer
         state.final_answer = answer
-        self.trace(state, "synthesis_complete", "Synthesized final response", metadata={"citations": len(state.citations), "preview": summarize_text(answer, 40)})
-        return self.outcome(state, confidence=0.82, message="Synthesized response", artifacts={"answer": answer})
+
+        self.trace(
+            state,
+            "synthesis_complete",
+            f"Synthesized research report ({len(answer.split())} words) with {len(citations)} citations",
+            metadata={"citations_count": len(citations), "preview": summarize_text(answer, 30)},
+        )
+
+        return self.outcome(
+            state,
+            confidence=0.88 if citations else 0.45,
+            message="Synthesized grounded research report",
+            artifacts={"answer": answer, "citations_count": len(citations)},
+        )

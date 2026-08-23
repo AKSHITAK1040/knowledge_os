@@ -23,7 +23,15 @@ class MemoryTests(unittest.TestCase):
         self.assertIn(item.id, scores)
         self.assertGreater(scores[item.id], 0.0)
 
+    def test_delete_memory(self) -> None:
+        store = MemoryStore(DeterministicLLMClient())
+        item = store.remember(user_id="u3", session_id="s1", summary="temporary note", payload={})
+        self.assertEqual(len(store.recall_user("u3")), 1)
+        store.delete_memory(item.id)
+        # Verify semantic search no longer returns it
+        results = store.recall_semantic("temporary note", top_k=5)
+        self.assertFalse(any(m.id == item.id for m in results))
+
 
 if __name__ == "__main__":
     unittest.main()
-

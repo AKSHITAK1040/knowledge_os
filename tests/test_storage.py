@@ -5,7 +5,7 @@ import unittest
 
 from knowledgeos.analytics.service import MetricsEvent
 from knowledgeos.storage.sqlite_store import KnowledgeOSSQLiteStore
-from knowledgeos.types import Citation, MemoryItem, TraceEvent
+from knowledgeos.types import Citation, KnowledgeChunk, MemoryItem, SourceKind, TraceEvent
 
 
 class StorageTests(unittest.TestCase):
@@ -26,14 +26,21 @@ class StorageTests(unittest.TestCase):
             store.record_metric(metric)
             memory = MemoryItem(id="m1", user_id="u1", session_id="s1", summary="memory")
             store.upsert_memory(memory)
+            chunk = KnowledgeChunk(id="c1", text="Sample text", source_kind=SourceKind.INTERNAL, metadata={"title": "test"})
+            store.upsert_chunk(chunk)
 
             self.assertEqual(len(store.list_traces()), 1)
             self.assertEqual(len(store.list_metrics()), 1)
             self.assertEqual(len(store.list_memories()), 1)
+            self.assertEqual(store.count_chunks(), 1)
+            
+            stats = store.stats()
+            self.assertEqual(stats["traces"], 1)
+            self.assertEqual(stats["chunks"], 1)
+
             hydrated = store.load_metrics()
             self.assertEqual(hydrated[0].name, "research")
 
 
 if __name__ == "__main__":
     unittest.main()
-

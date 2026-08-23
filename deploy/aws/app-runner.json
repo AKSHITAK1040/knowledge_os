@@ -1,0 +1,31 @@
+{
+  "ServiceName": "knowledgeos-api-service",
+  "SourceConfiguration": {
+    "ImageRepository": {
+      "ImageIdentifier": "123456789012.dkr.ecr.us-east-1.amazonaws.com/knowledgeos-api:latest",
+      "ImageConfiguration": {
+        "Port": "8000",
+        "RuntimeEnvironmentVariables": {
+          "KNOWLEDGEOS_ENV": "production",
+          "GROQ_API_KEY": "YOUR_GROQ_API_KEY",
+          "GROQ_MODEL": "openai/gpt-oss-120b",
+          "KNOWLEDGEOS_API_KEY": "dev-key"
+        }
+      },
+      "ImageRepositoryType": "ECR"
+    },
+    "AutoDeploymentsEnabled": true
+  },
+  "InstanceConfiguration": {
+    "Cpu": "1 vCPU",
+    "Memory": "2 GB"
+  },
+  "HealthCheckConfiguration": {
+    "Protocol": "HTTP",
+    "Path": "/health",
+    "Interval": 10,
+    "Timeout": 5,
+    "HealthyThreshold": 1,
+    "UnhealthyThreshold": 3
+  }
+}
