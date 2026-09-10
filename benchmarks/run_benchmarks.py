@@ -14,9 +14,17 @@ from knowledgeos.orchestration.supervisor import KnowledgeOSOrchestrator
 from knowledgeos.retrieval.hybrid import HybridRetriever
 
 
+from knowledgeos.storage.sqlite_store import KnowledgeOSSQLiteStore
+
+
 def main() -> None:
+    benchmark_db = Path(".knowledgeos/benchmark.sqlite3")
+    if benchmark_db.exists():
+        benchmark_db.unlink(missing_ok=True)
+    store = KnowledgeOSSQLiteStore(benchmark_db)
+
     llm = DeterministicLLMClient()
-    retriever = HybridRetriever(llm)
+    retriever = HybridRetriever(llm, sink=store)
     retriever.add_chunk(
         "KnowledgeOS combines supervisor orchestration, hybrid retrieval, and long-term memory for enterprise research workflows.",
         title="KnowledgeOS Overview",
@@ -30,7 +38,12 @@ def main() -> None:
         title="Hybrid RRF Retrieval",
     )
 
-    orchestrator = KnowledgeOSOrchestrator(llm=llm, retriever=retriever, memory_store=MemoryStore(llm))
+    orchestrator = KnowledgeOSOrchestrator(
+        llm=llm,
+        retriever=retriever,
+        memory_store=MemoryStore(llm, sink=store),
+        store=store,
+    )
     suite = BenchmarkSuite(orchestrator)
     report = suite.run(
         [

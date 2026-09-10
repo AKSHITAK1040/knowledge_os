@@ -1,0 +1,36 @@
+services:
+  # 1. Streamlit Interactive Dashboard
+  - type: web
+    name: knowledgeos-dashboard
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -e .
+    startCommand: streamlit run knowledgeos/frontend/app.py --server.port $PORT --server.address 0.0.0.0 --server.headless true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.13
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: KNOWLEDGEOS_API_KEY
+        value: dev-key
+
+  # 2. FastAPI REST Backend
+  - type: web
+    name: knowledgeos-api
+    env: python
+    region: oregon
+    plan: free
+    buildCommand: pip install -e .
+    startCommand: uvicorn knowledgeos.api.app:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.13
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: KNOWLEDGEOS_API_KEY
+        value: dev-key

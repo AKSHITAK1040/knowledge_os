@@ -8,6 +8,9 @@ from typing import Any
 from ..types import AgentOutcome, AgentStatus, Citation, ResearchState, TraceEvent
 
 
+from threading import Lock
+
+
 @dataclass(slots=True)
 class AgentContext:
     user_id: str
@@ -18,6 +21,7 @@ class AgentContext:
 
 class BaseAgent(ABC):
     name: str = "base"
+    _trace_lock = Lock()
 
     def __init__(self) -> None:
         self._last_run_at = 0.0
@@ -32,17 +36,18 @@ class BaseAgent(ABC):
         duration_ms: float = 0.0,
         parent_event_id: str | None = None,
     ) -> TraceEvent:
-        trace_id = state.artifacts.get("trace_id") or (state.trace[0].trace_id if state.trace else TraceEvent().trace_id)
-        event = TraceEvent(
-            trace_id=trace_id,
-            parent_event_id=parent_event_id,
-            agent_name=self.name,
-            event_type=event_type,
-            message=message,
-            duration_ms=duration_ms,
-            metadata=metadata or {},
-        )
-        state.trace.append(event)
+        with self._trace_lock:
+            trace_id = state.artifacts.get("trace_id") or (state.trace[0].trace_id if state.trace else TraceEvent().trace_id)
+            event = TraceEvent(
+                trace_id=trace_id,
+                parent_event_id=parent_event_id,
+                agent_name=self.name,
+                event_type=event_type,
+                message=message,
+                duration_ms=duration_ms,
+                metadata=metadata or {},
+            )
+            state.trace.append(event)
         return event
 
     def outcome(

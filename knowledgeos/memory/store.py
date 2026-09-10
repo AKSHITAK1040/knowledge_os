@@ -21,6 +21,12 @@ class SessionMemoryStore:
     def get(self, session_id: str) -> list[MemoryItem]:
         return list(self._items.get(session_id, []))
 
+    def remove(self, memory_id: str) -> None:
+        for sid in list(self._items.keys()):
+            self._items[sid] = [m for m in self._items[sid] if m.id != memory_id]
+            if not self._items[sid]:
+                self._items.pop(sid, None)
+
     def clear(self, session_id: str) -> None:
         self._items.pop(session_id, None)
 
@@ -35,6 +41,15 @@ class UserMemoryStore:
 
     def get(self, user_id: str) -> list[MemoryItem]:
         return list(self._items.get(user_id, []))
+
+    def remove(self, memory_id: str) -> None:
+        for uid in list(self._items.keys()):
+            self._items[uid] = [m for m in self._items[uid] if m.id != memory_id]
+            if not self._items[uid]:
+                self._items.pop(uid, None)
+
+    def clear(self, user_id: str) -> None:
+        self._items.pop(user_id, None)
 
 
 class SemanticMemoryStore:
@@ -139,10 +154,15 @@ class MemoryStore:
         return items
 
     def delete_memory(self, memory_id: str) -> bool:
+        self.session.remove(memory_id)
+        self.user.remove(memory_id)
         self.semantic.remove(memory_id)
         if self.sink is not None and hasattr(self.sink, "delete_memory"):
             return self.sink.delete_memory(memory_id)
         return True
+
+    def clear_user(self, user_id: str) -> None:
+        self.user.clear(user_id)
 
     def summarize(self, items: Iterable[MemoryItem], max_items: int = 5) -> str:
         selected = list(items)[:max_items]

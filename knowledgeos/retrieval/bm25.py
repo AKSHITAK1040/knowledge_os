@@ -5,11 +5,13 @@ import math
 from typing import Sequence
 
 from ..types import KnowledgeChunk
-from ..utils import tokenize
+from ..utils import stem_token, tokenize
+
+STOPWORDS = {"what", "are", "the", "for", "is", "in", "and", "of", "to", "how", "does", "with", "a", "an", "on", "as", "by", "or"}
 
 
 class BM25Index:
-    """BM25Okapi inverted index with title and body weighting."""
+    """BM25Okapi inverted index with title, body weighting, stemming, and stopword filtering."""
 
     def __init__(self, k1: float = 1.5, b: float = 0.75) -> None:
         self.k1 = k1
@@ -21,10 +23,10 @@ class BM25Index:
         self.avgdl: float = 0.0
 
     def add(self, chunk: KnowledgeChunk) -> None:
-        # Give extra weight to title tokens
+        # Give extra weight to title tokens and stem all tokens
         title = str(chunk.metadata.get("title", ""))
-        title_tokens = tokenize(title) * 2
-        body_tokens = tokenize(chunk.text)
+        title_tokens = [stem_token(t) for t in tokenize(title)] * 2
+        body_tokens = [stem_token(t) for t in tokenize(chunk.text)]
         all_tokens = title_tokens + body_tokens
         
         terms = Counter(all_tokens)
@@ -44,7 +46,10 @@ class BM25Index:
             self.add(chunk)
 
     def score(self, query: str, chunk_index: int) -> float:
-        query_terms = tokenize(query)
+        raw_tokens = tokenize(query)
+        query_terms = [stem_token(t) for t in raw_tokens if t not in STOPWORDS]
+        if not query_terms:
+            query_terms = [stem_token(t) for t in raw_tokens]
         if not query_terms or chunk_index >= len(self.chunks):
             return 0.0
 
@@ -68,5 +73,6 @@ class BM25Index:
         if not self.chunks:
             return []
         scored = [(chunk, self.score(query, i)) for i, chunk in enumerate(self.chunks)]
+        scored = [(chunk, s) for chunk, s in scored if s > 0.0]
         scored.sort(key=lambda item: item[1], reverse=True)
         return scored[:top_k]

@@ -53,6 +53,17 @@ class IngestionTests(unittest.TestCase):
         reports = self.pipeline.ingest_batch(items)
         self.assertEqual(len(reports), 2)
 
+    def test_ingest_bytes_csv_and_json(self) -> None:
+        csv_bytes = b"Service,Port\napi,8000\nfrontend,8501\n"
+        csv_report = self.pipeline.ingest_bytes(csv_bytes, "services.csv")
+        self.assertEqual(csv_report.source, "services.csv")
+        self.assertGreaterEqual(csv_report.chunks_created, 1)
+
+        json_bytes = b'[{"architecture": "supervisor", "model": "gpt"}]'
+        json_report = self.pipeline.ingest_bytes(json_bytes, "arch.json")
+        self.assertEqual(json_report.source, "arch.json")
+        self.assertGreaterEqual(json_report.chunks_created, 1)
+
 
 if __name__ == "__main__":
     unittest.main()

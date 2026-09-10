@@ -250,6 +250,65 @@ class IngestionPipeline:
 
         return f"[PDF text extraction failed for '{filename}'. The file may be scanned or image-based.]"
 
+    def _read_docx_bytes(self, data: bytes) -> str:
+        """Extract text from DOCX bytes without writing to disk."""
+        try:
+            from docx import Document
+            import io as _io
+
+            doc = Document(_io.BytesIO(data))
+            return "\n\n".join(p.text for p in doc.paragraphs if p.text.strip())
+        except Exception:
+            return data.decode("utf-8", errors="ignore")
+
+    def _read_csv_bytes(self, data: bytes) -> str:
+        """Extract structured text from CSV bytes."""
+        try:
+            import io as _io
+
+            text_stream = _io.StringIO(data.decode("utf-8", errors="ignore"))
+            reader = csv.reader(text_stream)
+            headers = next(reader, None)
+            lines = []
+            if headers:
+                for row in reader:
+                    row_parts = [f"{h}: {v}" for h, v in zip(headers, row) if v]
+                    lines.append(", ".join(row_parts))
+            return "\n".join(lines) if lines else data.decode("utf-8", errors="ignore")
+        except Exception:
+            return data.decode("utf-8", errors="ignore")
+
+    def _read_json_bytes(self, data: bytes) -> str:
+        """Extract structured text from JSON bytes."""
+        try:
+            text = data.decode("utf-8", errors="ignore")
+            parsed = json.loads(text)
+            if isinstance(parsed, list):
+                return "\n\n".join(json.dumps(item) if isinstance(item, dict) else str(item) for item in parsed)
+            return json.dumps(parsed, indent=2)
+        except Exception:
+            return data.decode("utf-8", errors="ignore")
+
+    def ingest_bytes(self, data: bytes, filename: str, metadata: dict[str, Any] | None = None) -> IngestionReport:
+        """Ingest document directly from raw bytes (PDF, DOCX, CSV, JSON, TXT, MD)."""
+        suffix = Path(filename).suffix.lower()
+        if suffix == ".pdf":
+            text = self._read_pdf_bytes(data, filename=filename)
+        elif suffix == ".docx":
+            text = self._read_docx_bytes(data)
+        elif suffix == ".csv":
+            text = self._read_csv_bytes(data)
+        elif suffix == ".json":
+            text = self._read_json_bytes(data)
+        else:
+            text = data.decode("utf-8", errors="ignore")
+
+        return self.ingest_text(
+            text,
+            title=filename,
+            source_kind=SourceKind.INTERNAL,
+            metadata=merge_metadata(metadata or {}, {"filename": filename, "suffix": suffix, "size_bytes": len(data)}),
+        )
 
     def _read_docx(self, path: Path) -> str:
         try:

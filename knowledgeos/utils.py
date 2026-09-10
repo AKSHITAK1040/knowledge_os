@@ -144,10 +144,18 @@ def summarize_text(text: str, max_words: int = 60) -> str:
     return " ".join(words[:max_words]).strip() + " ..."
 
 
+def stem_token(token: str) -> str:
+    """Lightweight rule-based suffix stemming for English tokens."""
+    for suffix in ("ions", "ion", "ing", "ies", "es", "ed", "s"):
+        if token.endswith(suffix) and len(token) - len(suffix) >= 3:
+            return token[:-len(suffix)]
+    return token
+
+
 def score_overlap(query: str, text: str) -> float:
-    """Calculate token overlap coefficient between query/claim and reference text."""
-    query_tokens = Counter(tokenize(query))
-    text_tokens = Counter(tokenize(text))
+    """Calculate token overlap coefficient between query/claim and reference text with stemming."""
+    query_tokens = Counter(stem_token(t) for t in tokenize(query))
+    text_tokens = Counter(stem_token(t) for t in tokenize(text))
     if not query_tokens or not text_tokens:
         return 0.0
     common = sum(min(query_tokens[token], text_tokens[token]) for token in query_tokens)

@@ -36,5 +36,6 @@ class DenseIndex:
             return []
         query_embedding = self.embedding_client.embed(query)
         scored = [(chunk, cosine_similarity(query_embedding, chunk.embedding)) for chunk in self.chunks]
+        scored = [(chunk, sim) for chunk, sim in scored if sim >= 0.15]
         scored.sort(key=lambda item: item[1], reverse=True)
         return scored[:top_k]

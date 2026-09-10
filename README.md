@@ -37,15 +37,15 @@
 
 ### 6. 🌐 Modern FastAPI Backend & Pydantic v2 Models
 - Versioned REST endpoints with comprehensive Pydantic v2 schemas and validation.
-- Endpoints for Chat, Deep Research, Ingest, Memory CRUD, Analytics, Traces, and Health.
-- Token-bucket sliding-window rate limiting, API key / Bearer token authentication, and CORS.
+- Endpoints for Chat, Deep Research, Ingest (Text/File/Batch), Memory CRUD & Compression (`/v1/memory/compress`), System Info (`/v1/info`), Analytics, Traces, Prometheus Metrics (`/metrics`), and Health.
+- Token-bucket sliding-window rate limiting, strict Bearer / API key authentication, and CORS.
 
 ### 7. 🖥️ 5-Workspace Streamlit Dashboard
-- 🔬 **Research Studio**: Interactive agent research console with citations, evidence drawers, and plan inspector.
-- 📥 **Knowledge Ingestion Hub**: Multi-file uploader (PDF/DOCX/TXT/MD/CSV/JSON), URL scraper, and chunk viewer.
-- 🧠 **Memory Explorer**: User & session memory manager with decay curve visualizer and compression tool.
-- ⚖️ **Evaluation & Guardrails**: Live RAG Triad radar gauges and critique inspector.
-- 📊 **Observability & Analytics**: Latency percentiles (p50/p95), cost estimation, trace waterfall, and top cited sources.
+- 🔬 **Research Studio**: Interactive agent research console with citations, evidence drawers, plan inspector, and one-click **Markdown & JSON Report Exporters**.
+- 📥 **Knowledge Ingestion Hub**: In-memory multi-file uploader (PDF/DOCX/TXT/MD/CSV/JSON), URL scraper, and chunk viewer.
+- 🧠 **Memory Explorer**: User & session memory manager with decay curve visualizer, instant deletion sync, and compression tool.
+- ⚖️ **Evaluation & Guardrails**: Live RAG Triad gauges (Grounding, Context Precision, Relevance) and automated critique inspector.
+- 📊 **Observability & Analytics**: Latency trend line charts, percentiles (p50/p95), cost estimation, trace waterfall, and top cited sources.
 
 ---
 
@@ -102,5 +102,6 @@ KNOWLEDGEOS_API_KEY=dev-key
 | **Retrieval Precision** | **100% (1.00)** |
 | **Citation Accuracy** | **100% (1.00)** |
 | **Answer Relevance** | **100% (1.00)** |
-| **Overall Confidence** | **72.3% (0.72)** |
-| **Test Suite Pass Rate** | **100% (21/21 passed)** |
+| **Execution Latency** | **~82 ms** (Ultra-fast) |
+| **Overall Confidence** | **72.4% (0.72)** |
+| **Test Suite Pass Rate** | **100% (30/30 passed)** |

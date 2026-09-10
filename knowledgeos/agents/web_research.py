@@ -19,8 +19,12 @@ class WebResearchAgent(BaseAgent):
             self.trace(state, "web_research_failed", "Web research failed", metadata={"error": str(exc)})
             return self.outcome(state, status=AgentStatus.FAILED, confidence=0.1, message="Web research failed", error=str(exc))
         citations = [result.to_citation() for result in results]
-        state.evidence.extend(citations)
-        state.citations.extend(citations)
-        self.trace(state, "web_research_complete", "Web research completed", metadata={"results": len(results)})
-        return self.outcome(state, confidence=0.65 if citations else 0.2, message="Collected web evidence", evidence=citations, artifacts={"results": [citation.title for citation in citations]})
+        self.trace(state, "web_research_complete", f"Web research completed with {len(citations)} citations", metadata={"results": len(results)})
+        return self.outcome(
+            state,
+            confidence=0.75 if citations else 0.2,
+            message="Collected web evidence",
+            evidence=citations,
+            artifacts={"results": [citation.title for citation in citations]},
+        )
 

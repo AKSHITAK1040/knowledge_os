@@ -71,7 +71,7 @@ class HybridRetriever:
         metadata: dict[str, Any] | None = None,
     ) -> KnowledgeChunk:
         metadata = metadata or {}
-        chunk_id = stable_hash(f"{title}:{self._source_counter}:{text[:64]}")
+        chunk_id = stable_hash(f"{title}:{text}")
         chunk = KnowledgeChunk(
             id=chunk_id,
             text=text,
@@ -152,7 +152,13 @@ class HybridRetriever:
                 scored_candidates.append((chunk, final_score))
 
         scored_candidates.sort(key=lambda item: item[1], reverse=True)
-        selected = scored_candidates[:top_k]
+        if scored_candidates:
+            top_score = scored_candidates[0][1]
+            min_score = max(0.10, top_score * 0.52)
+            filtered_candidates = [item for item in scored_candidates if item[1] >= min_score]
+            selected = filtered_candidates[:top_k] if filtered_candidates else scored_candidates[:1]
+        else:
+            selected = []
 
         citations: list[Citation] = []
         for chunk, score in selected:

@@ -6,6 +6,7 @@ import os
 import re
 from typing import Any, Sequence
 
+from .config import settings
 from .types import QueryIntent
 from .utils import deterministic_embedding, extract_claims, tokenize
 
@@ -109,11 +110,14 @@ class DeterministicLLMClient(LLMClient, EmbeddingClient):
 
             for idx, (title, excerpt) in enumerate(evidence_items[:5], start=1):
                 clean_excerpt = excerpt.strip(" .")
-                if idx <= 2:
-                    summary_parts.append(f"In addressing {query}, **{title}** [{idx}] establishes that {clean_excerpt}.")
+                summary_parts.append(f"In addressing {query}, evidence from **{title}** [{idx}] verifies that {clean_excerpt}.")
                 findings_parts.append(f"- **{title}** [{idx}]: {clean_excerpt}.")
-                if idx == 1:
-                    synthesis_parts.append(f"In conclusion, evidence from **{title}** [{idx}] confirms {clean_excerpt} to resolve {query}.")
+
+            if evidence_items:
+                primary_title, primary_excerpt = evidence_items[0]
+                synthesis_parts.append(
+                    f"Strategic analysis indicates that {primary_excerpt.strip(' .')}, supported by validated findings from **{primary_title}** [1] for {query}."
+                )
 
             summary_text = " ".join(summary_parts) if summary_parts else f"Analysis of **{query}** synthesized from retrieved sources."
             findings_text = "\n".join(findings_parts)
@@ -142,11 +146,11 @@ class GroqAdapter(LLMClient, EmbeddingClient):
         self,
         api_key: str | None = None,
         model: str | None = None,
-        base_url: str = "https://api.groq.com/openai/v1",
+        base_url: str | None = None,
     ) -> None:
-        self.api_key = api_key or os.getenv("GROQ_API_KEY", "")
-        self.model = model or os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
-        self.base_url = base_url or os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+        self.api_key = api_key or settings.groq_api_key or os.getenv("GROQ_API_KEY", "")
+        self.model = model or settings.groq_model or os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
+        self.base_url = base_url or settings.groq_base_url or os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
         self._fallback = DeterministicLLMClient()
 
     def generate(
@@ -170,7 +174,14 @@ class GroqAdapter(LLMClient, EmbeddingClient):
             })
         messages.append({"role": "user", "content": prompt})
 
-        candidate_models = [self.model, "openai/gpt-oss-120b", "qwen/qwen3.6-27b", "openai/gpt-oss-20b"]
+        candidate_models = [
+            self.model,
+            "openai/gpt-oss-120b",
+            "llama-3.3-70b-versatile",
+            "qwen/qwen3.8-27b",
+            "openai/gpt-oss-20b",
+            "llama-3.1-8b-instant",
+        ]
         seen_models = set()
 
         try:

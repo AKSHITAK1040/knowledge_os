@@ -45,9 +45,9 @@ def _authenticate(request: Request) -> dict[str, str]:
     expected = os.getenv("KNOWLEDGEOS_API_KEY", "dev-key")
     auth_header = request.headers.get("Authorization", "")
     token = auth_header.replace("Bearer ", "").strip() if auth_header.startswith("Bearer ") else ""
-    api_key = request.headers.get("x-api-key", "") or token or "dev-key"
+    api_key = request.headers.get("x-api-key", "") or token
 
-    if api_key != expected:
+    if not api_key or api_key != expected:
         raise HTTPException(status_code=401, detail="Invalid API key or Bearer token")
     return {
         "role": request.headers.get("x-role", "admin"),
@@ -210,6 +210,34 @@ def create_memory(payload: MemoryCreateRequest, auth: dict[str, str] = Depends(_
 def delete_memory(memory_id: str, auth: dict[str, str] = Depends(_authenticate)) -> dict[str, Any]:
     success = orchestrator.memory_store.delete_memory(memory_id)
     return {"deleted": success, "memory_id": memory_id}
+
+
+@app.post("/v1/memory/compress")
+def compress_memory(
+    user_id: str = Query(..., description="Target user ID to compress memories for"),
+    auth: dict[str, str] = Depends(_authenticate),
+) -> dict[str, Any]:
+    compressed = orchestrator.memory_store.compress(user_id)
+    return {
+        "user_id": user_id,
+        "compressed_items": len(compressed),
+        "items": [asdict(m) for m in compressed],
+    }
+
+
+@app.get("/v1/info")
+def system_info(auth: dict[str, str] = Depends(_authenticate)) -> dict[str, Any]:
+    return {
+        "app_name": settings.app_name,
+        "version": "1.0.0",
+        "environment": settings.environment,
+        "llm_provider": "Groq",
+        "groq_model": settings.groq_model,
+        "retrieval_top_k": settings.retrieval_top_k,
+        "rate_limit_per_minute": settings.api_rate_limit_per_minute,
+        "memory_decay_halflife_hours": settings.memory_decay_halflife_hours,
+        "stats": orchestrator.store.stats(),
+    }
 
 
 @app.get("/analytics")

@@ -131,9 +131,31 @@ class KnowledgeOSOrchestrator:
                     )
                     outcomes[name] = AgentOutcome(agent_name=name, status=AgentStatus.FAILED, confidence=0.0, error=str(exc))
 
-        # Deduplicate citations and evidence
+        # Consolidate evidence, citations, and chunks deterministically from parallel agent outcomes
+        for name, outcome in outcomes.items():
+            if outcome.evidence:
+                state.evidence.extend(outcome.evidence)
+                state.citations.extend(outcome.evidence)
+            if name == "retrieval" and "chunks" in outcome.artifacts:
+                state.retrieved_chunks.extend(outcome.artifacts["chunks"])
+            if name == "retrieval" and "diagnostics" in outcome.artifacts:
+                state.artifacts["retrieval"] = outcome.artifacts["diagnostics"]
+
+        # Deduplicate chunks by id
+        seen_chunk_ids: set[str] = set()
+        deduped_chunks = []
+        for chunk in state.retrieved_chunks:
+            if chunk.id not in seen_chunk_ids:
+                seen_chunk_ids.add(chunk.id)
+                deduped_chunks.append(chunk)
+        state.retrieved_chunks = deduped_chunks
+
+        # Deduplicate citations and evidence, sorted by score descending
         state.citations = dedupe_citations(state.citations)
-        state.evidence = dedupe_citations(state.evidence)
+        state.citations.sort(key=lambda c: c.score, reverse=True)
+        max_citations = max(request.top_k, 8)
+        state.citations = state.citations[:max_citations]
+        state.evidence = list(state.citations)
 
         # 3. Synthesis Stage
         outcomes["synthesis"] = self.synthesis.run(state)
@@ -161,7 +183,23 @@ class KnowledgeOSOrchestrator:
             )
 
             # Re-execute targeted retrieval & synthesis with critique
-            outcomes["retrieval"] = self.retrieval.run(state)
+            retrieval_outcome = self.retrieval.run(state)
+            outcomes["retrieval"] = retrieval_outcome
+            if retrieval_outcome.evidence:
+                state.evidence.extend(retrieval_outcome.evidence)
+                state.citations.extend(retrieval_outcome.evidence)
+                state.citations = dedupe_citations(state.citations)
+                state.evidence = dedupe_citations(state.evidence)
+            if "chunks" in retrieval_outcome.artifacts:
+                state.retrieved_chunks.extend(retrieval_outcome.artifacts["chunks"])
+                seen_c_ids: set[str] = set()
+                deduped = []
+                for c in state.retrieved_chunks:
+                    if c.id not in seen_c_ids:
+                        seen_c_ids.add(c.id)
+                        deduped.append(c)
+                state.retrieved_chunks = deduped
+
             outcomes["synthesis"] = self.synthesis.run(state)
             outcomes["evaluation"] = self.evaluator.run(state)
 

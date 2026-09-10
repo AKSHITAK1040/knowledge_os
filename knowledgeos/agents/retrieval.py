@@ -17,8 +17,8 @@ class RetrievalAgent(BaseAgent):
         top_k = state.request.top_k or 8
         queries_to_run = state.sub_queries or [state.request.query]
 
-        collected_chunks = list(state.retrieved_chunks)
-        collected_citations = list(state.citations)
+        collected_chunks = []
+        collected_citations = []
         diagnostics = {}
 
         for q in queries_to_run[:3]:
@@ -35,10 +35,7 @@ class RetrievalAgent(BaseAgent):
                 seen_chunk_ids.add(chunk.id)
                 deduped_chunks.append(chunk)
 
-        state.retrieved_chunks = deduped_chunks
-        state.citations = dedupe_citations(collected_citations)
-        state.evidence.extend(state.citations)
-        state.artifacts["retrieval"] = diagnostics
+        citations = dedupe_citations(collected_citations)
 
         self.trace(
             state,
@@ -51,6 +48,6 @@ class RetrievalAgent(BaseAgent):
             state,
             confidence=0.85 if deduped_chunks else 0.3,
             message=f"Retrieved {len(deduped_chunks)} internal evidence chunks",
-            evidence=state.citations,
-            artifacts=diagnostics,
+            evidence=citations,
+            artifacts={"diagnostics": diagnostics, "chunks": deduped_chunks},
         )

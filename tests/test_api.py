@@ -72,6 +72,43 @@ class APITests(unittest.TestCase):
         self.assertEqual(traces_res.status_code, 200)
         self.assertIn("items", traces_res.json())
 
+    def test_auth_rejection(self) -> None:
+        # Missing auth header should be rejected
+        res = self.client.get("/health")
+        self.assertEqual(res.status_code, 401)
+
+        # Invalid key should be rejected
+        res_bad = self.client.get("/health", headers={"x-api-key": "wrong-key"})
+        self.assertEqual(res_bad.status_code, 401)
+
+    def test_system_info_endpoint(self) -> None:
+        res = self.client.get("/v1/info", headers=self.headers)
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertEqual(data["app_name"], "KnowledgeOS")
+        self.assertIn("stats", data)
+
+    def test_memory_compress_endpoint(self) -> None:
+        # Add memories
+        self.client.post(
+            "/v1/memory",
+            json={"user_id": "compress-user", "session_id": "s1", "summary": "quantum theory overview", "importance": 0.5},
+            headers=self.headers,
+        )
+        self.client.post(
+            "/v1/memory",
+            json={"user_id": "compress-user", "session_id": "s2", "summary": "quantum theory overview notes", "importance": 0.6},
+            headers=self.headers,
+        )
+        res = self.client.post("/v1/memory/compress?user_id=compress-user", headers=self.headers)
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("compressed_items", res.json())
+
+    def test_prometheus_metrics_endpoint(self) -> None:
+        res = self.client.get("/metrics")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn("knowledgeos_requests_total", res.text)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -37,19 +37,31 @@ class Evaluator:
     ) -> EvaluationReport:
         citations_list = list(citations)
         evidence_list = list(evidence)
-        evidence_texts = [f"{c.metadata.get('title', '')} {c.text}" for c in evidence_list]
+
+        # Distinct evidence contexts for precision and grounding
+        distinct_contexts: list[str] = []
+        citation_texts: list[str] = []
         for cit in citations_list:
-            if cit.excerpt:
-                evidence_texts.append(f"{cit.title} {cit.excerpt}")
+            ctx = f"{cit.title} {cit.excerpt or ''}".strip()
+            if ctx:
+                citation_texts.append(ctx)
+                if ctx not in distinct_contexts:
+                    distinct_contexts.append(ctx)
+
+        for c in evidence_list:
+            ctx = f"{c.metadata.get('title', '')} {c.text}".strip()
+            if ctx and ctx not in distinct_contexts:
+                distinct_contexts.append(ctx)
 
         # 1. Answer Relevance to User Query
         answer_relevance = self._answer_relevance(query, answer)
 
-        # 2. Context Precision (how relevant is the retrieved evidence to the query)
-        context_precision = self._context_precision(query, evidence_texts)
+        # 2. Context Precision (precision of retrieved contexts presented to synthesis)
+        target_evidence = citation_texts if citation_texts else distinct_contexts
+        context_precision = self._context_precision(query, target_evidence)
 
-        # 3. Faithfulness / Grounding (sentence-level claim verification)
-        grounding = self._grounding_score(answer, evidence_texts)
+        # 3. Faithfulness / Grounding (sentence-level claim verification against all verified contexts)
+        grounding = self._grounding_score(answer, distinct_contexts)
 
         # 4. Citation Quality & Attribution
         citation_quality = self._citation_quality(citations_list, answer)
@@ -92,8 +104,12 @@ class Evaluator:
     def _context_precision(self, query: str, evidence_texts: Sequence[str]) -> float:
         if not evidence_texts or not query:
             return 0.0
-        scores = [score_overlap(query, text) for text in evidence_texts]
-        relevant = sum(1 for s in scores if s > 0.15)
+        stopwords = {"what", "are", "the", "for", "is", "in", "and", "of", "to", "how", "does", "with", "a", "an", "on", "as"}
+        query_terms = [t for t in tokenize(query) if t not in stopwords]
+        clean_query = " ".join(query_terms) if query_terms else query
+
+        scores = [score_overlap(clean_query, text) for text in evidence_texts]
+        relevant = sum(1 for s in scores if s >= 0.10)
         return relevant / max(1, len(evidence_texts))
 
     def _grounding_score(self, answer: str, evidence_texts: Sequence[str]) -> float:

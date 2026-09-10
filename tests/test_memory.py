@@ -27,8 +27,11 @@ class MemoryTests(unittest.TestCase):
         store = MemoryStore(DeterministicLLMClient())
         item = store.remember(user_id="u3", session_id="s1", summary="temporary note", payload={})
         self.assertEqual(len(store.recall_user("u3")), 1)
+        self.assertEqual(len(store.recall_session("s1")), 1)
         store.delete_memory(item.id)
-        # Verify semantic search no longer returns it
+        # Verify user, session, and semantic search no longer return it
+        self.assertEqual(len(store.recall_user("u3")), 0)
+        self.assertEqual(len(store.recall_session("s1")), 0)
         results = store.recall_semantic("temporary note", top_k=5)
         self.assertFalse(any(m.id == item.id for m in results))
 

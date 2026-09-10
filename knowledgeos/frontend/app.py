@@ -168,6 +168,26 @@ with tab1:
             st.markdown("### 📄 Synthesized Research Report")
             st.markdown(resp.answer)
 
+            # Export download buttons
+            d_col1, d_col2 = st.columns(2)
+            with d_col1:
+                st.download_button(
+                    "📥 Export Report (.md)",
+                    data=f"# Research Report: {query}\n\n{resp.answer}\n\n## Sources\n" + "\n".join(f"- [{c.title}]({c.url or '#'}): {c.excerpt or ''}" for c in resp.citations),
+                    file_name="knowledgeos_report.md",
+                    mime="text/markdown",
+                    use_container_width=True,
+                )
+            with d_col2:
+                import json as _json
+                st.download_button(
+                    "📥 Export Payload (.json)",
+                    data=_json.dumps(resp.asdict(), indent=2),
+                    file_name="knowledgeos_payload.json",
+                    mime="application/json",
+                    use_container_width=True,
+                )
+
             if resp.citations:
                 st.markdown("### 📚 Source Citations")
                 for idx, citation in enumerate(resp.citations, start=1):
@@ -207,37 +227,9 @@ with tab2:
         if uploaded_files and st.button("Ingest Uploaded Files", type="primary"):
             for f in uploaded_files:
                 file_bytes = f.read()
-                suffix = Path(f.name).suffix.lower()
-
                 with st.spinner(f"Processing '{f.name}'..."):
                     try:
-                        if suffix == ".pdf":
-                            # Use the bytes-aware PDF extractor
-                            text = ingestion._read_pdf_bytes(file_bytes, filename=f.name)
-                            if text.startswith("[PDF text extraction failed"):
-                                st.error(f"'{f.name}': {text}")
-                                continue
-                        elif suffix == ".docx":
-                            import io as _io
-                            temp_path = Path(".knowledgeos/uploads") / f.name
-                            temp_path.parent.mkdir(parents=True, exist_ok=True)
-                            temp_path.write_bytes(file_bytes)
-                            text = ingestion._read_docx(temp_path)
-                        elif suffix == ".csv":
-                            import io as _io
-                            temp_path = Path(".knowledgeos/uploads") / f.name
-                            temp_path.parent.mkdir(parents=True, exist_ok=True)
-                            temp_path.write_bytes(file_bytes)
-                            text = ingestion._read_csv(temp_path)
-                        else:
-                            # md, txt, json — safe to decode as utf-8
-                            text = file_bytes.decode("utf-8", errors="ignore")
-
-                        if not text or not text.strip():
-                            st.warning(f"No readable text found in '{f.name}'. The file may be empty or image-only.")
-                            continue
-
-                        report = ingestion.ingest_text(text, title=f.name)
+                        report = ingestion.ingest_bytes(file_bytes, filename=f.name)
                         st.success(f"✅ Ingested '{f.name}': **{report.chunks_created} semantic chunks** created and indexed!")
                     except Exception as exc:
                         st.error(f"Failed to ingest '{f.name}': {exc}")
@@ -378,6 +370,10 @@ with tab5:
     a_col2.metric("Avg Latency", f"{summary.get('average_latency_ms', 0.0)} ms")
     a_col3.metric("P95 Latency", f"{summary.get('p95_latency_ms', 0.0)} ms")
     a_col4.metric("Estimated Cost", f"${summary.get('cost_usd', 0.0):.5f}")
+
+    if analytics.events:
+        st.markdown("### 📈 Multi-Agent Execution Latency (ms)")
+        st.line_chart([e.duration_ms for e in analytics.events])
 
     st.markdown("---")
     st.markdown("### 🏆 Top Cited Knowledge Documents")
