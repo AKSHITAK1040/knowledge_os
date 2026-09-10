@@ -1,0 +1,15 @@
+﻿Renewable Energy Market and Grid Integration Report 2025
+
+1. Global Capacity Growth:
+Global renewable energy capacity reached 4,200 Gigawatts (GW) in 2024, representing an annual growth rate of 14.5%. Solar photovoltaic (PV) accounted for 72% of all new net capacity additions worldwide.
+
+2. Levelized Cost of Energy (LCOE):
+- Utility-scale solar PV dropped to an average of $0.038 per kilowatt-hour (kWh).
+- Onshore wind averaged $0.033 per kWh, remaining one of the cheapest new electricity generation sources.
+- Offshore wind averaged $0.074 per kWh, driven by deeper water floating turbines.
+
+3. Battery Energy Storage Systems (BESS):
+Grid-scale lithium iron phosphate (LFP) battery installations expanded by 125% year-over-year. The average 4-hour duration battery system capital cost dropped below $140 per kWh in early 2025. Sodium-ion batteries emerged as a viable alternative for stationary storage due to lower raw material constraints.
+
+4. Grid Modernization Challenges:
+Transmission queue backlogs in North America and Europe exceed 1,500 GW. High-voltage direct current (HVDC) transmission lines and AI-driven dynamic line rating (DLR) systems are being deployed to increase transmission throughput by up to 30% without building new physical towers.
