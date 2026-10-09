@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import asdict, dataclass, field
 import time
-from typing import Any
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
+from typing import Any
 
 from ..agents.academic_research import AcademicResearchAgent
 from ..agents.evaluation import EvaluationAgent
@@ -16,11 +16,11 @@ from ..agents.web_research import WebResearchAgent
 from ..analytics.service import AnalyticsService, MetricsEvent
 from ..config import Settings, settings
 from ..evaluation.evaluator import Evaluator
-from ..llm import DeterministicLLMClient, GroqAdapter, LLMClient, OpenAIAdapter, VoyageEmbeddingAdapter
+from ..llm import GroqAdapter, LLMClient, VoyageEmbeddingAdapter
 from ..memory.store import MemoryStore
 from ..retrieval.hybrid import HybridRetriever
 from ..storage.sqlite_store import KnowledgeOSSQLiteStore
-from ..types import AgentOutcome, AgentStatus, QueryIntent, ResearchRequest, ResearchResponse, ResearchState, TraceEvent
+from ..types import AgentOutcome, AgentStatus, ResearchRequest, ResearchResponse, ResearchState, TraceEvent
 from ..utils import dedupe_citations
 
 

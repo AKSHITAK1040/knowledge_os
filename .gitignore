@@ -30,6 +30,7 @@ pip-wheel-metadata/
 # Environment secrets
 .env
 .env.*
+!.env.example
 
 # Editor settings
 .vscode/

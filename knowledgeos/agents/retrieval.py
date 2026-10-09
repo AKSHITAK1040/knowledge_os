@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..retrieval.hybrid import HybridRetriever
-from ..types import AgentOutcome, AgentStatus, ResearchState
+from ..types import AgentOutcome, ResearchState
 from ..utils import dedupe_citations
 from .base import BaseAgent
 

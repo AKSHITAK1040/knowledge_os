@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections import Counter
 import math
+from collections import Counter
 from typing import Sequence
 
 from ..types import KnowledgeChunk
@@ -28,17 +28,17 @@ class BM25Index:
         title_tokens = [stem_token(t) for t in tokenize(title)] * 2
         body_tokens = [stem_token(t) for t in tokenize(chunk.text)]
         all_tokens = title_tokens + body_tokens
-        
+
         terms = Counter(all_tokens)
         doc_len = len(all_tokens)
-        
+
         self.chunks.append(chunk)
         self.term_freqs.append(terms)
         self.doc_lengths.append(doc_len)
-        
+
         for term in terms:
             self.doc_freq[term] += 1
-            
+
         self.avgdl = sum(self.doc_lengths) / max(1, len(self.doc_lengths))
 
     def add_batch(self, chunks: Sequence[KnowledgeChunk]) -> None:

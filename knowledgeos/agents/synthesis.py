@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..llm import LLMClient
-from ..types import AgentOutcome, AgentStatus, ResearchState
+from ..types import AgentOutcome, ResearchState
 from ..utils import dedupe_citations, summarize_text
 from .base import BaseAgent
 

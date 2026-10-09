@@ -1,14 +1,12 @@
 from __future__ import annotations
 
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-import time
+from threading import Lock
 from typing import Any
 
 from ..types import AgentOutcome, AgentStatus, Citation, ResearchState, TraceEvent
-
-
-from threading import Lock
 
 
 @dataclass(slots=True)

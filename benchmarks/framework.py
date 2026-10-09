@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
 import statistics
 import time
+from dataclasses import asdict, dataclass, field
 from typing import Iterable
 
 from knowledgeos.evaluation.evaluator import Evaluator

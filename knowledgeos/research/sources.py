@@ -1,13 +1,13 @@
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from html.parser import HTMLParser
 from urllib.parse import quote_plus
 from urllib.request import urlopen
-import xml.etree.ElementTree as ET
 
 from ..types import Citation, SourceKind
-from ..utils import summarize_text, stable_hash
+from ..utils import stable_hash, summarize_text
 
 
 @dataclass(slots=True)

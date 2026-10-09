@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from collections import Counter, defaultdict
-from dataclasses import asdict, dataclass, field
 import statistics
 import time
+from collections import Counter
+from dataclasses import dataclass, field
 from typing import Any
 
 from ..types import Citation

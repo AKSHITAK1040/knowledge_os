@@ -1,21 +1,20 @@
 from __future__ import annotations
 
-from collections import defaultdict, deque
-from dataclasses import asdict
 import os
 import time
+from collections import defaultdict, deque
+from dataclasses import asdict
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from ..analytics.service import AnalyticsService
-from ..api.models import BatchIngestRequest, ChatRequest, IngestRequest, MemoryCreateRequest, MemoryQuery
+from ..api.models import BatchIngestRequest, ChatRequest, IngestRequest, MemoryCreateRequest
 from ..config import settings
 from ..ingestion.pipeline import IngestionPipeline
 from ..orchestration.supervisor import KnowledgeOSOrchestrator
 from ..types import QueryIntent, ResearchRequest
-
 
 app = FastAPI(
     title="KnowledgeOS API",
@@ -75,7 +74,8 @@ async def middleware(request: Request, call_next):
 
 @app.get("/")
 @app.get("/health")
-def health(_: dict[str, str] = Depends(_authenticate)) -> dict[str, Any]:
+@app.get("/healthz")
+def health(request: Request) -> dict[str, Any]:
     stats = orchestrator.store.stats()
     return {
         "status": "ok",

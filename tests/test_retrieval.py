@@ -4,7 +4,6 @@ import unittest
 
 from knowledgeos.llm import DeterministicLLMClient
 from knowledgeos.retrieval.bm25 import BM25Index
-from knowledgeos.retrieval.dense import DenseIndex
 from knowledgeos.retrieval.hybrid import HybridRetriever, expand_query
 from knowledgeos.types import KnowledgeChunk
 from knowledgeos.utils import reciprocal_rank_fusion

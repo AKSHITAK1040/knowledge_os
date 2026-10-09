@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 if __package__ in {None, ""}:  # pragma: no cover
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -12,8 +12,6 @@ from knowledgeos.llm import DeterministicLLMClient
 from knowledgeos.memory.store import MemoryStore
 from knowledgeos.orchestration.supervisor import KnowledgeOSOrchestrator
 from knowledgeos.retrieval.hybrid import HybridRetriever
-
-
 from knowledgeos.storage.sqlite_store import KnowledgeOSSQLiteStore
 
 

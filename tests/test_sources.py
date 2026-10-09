@@ -6,11 +6,9 @@ from unittest.mock import MagicMock, patch
 from knowledgeos.research.sources import (
     AcademicSearchClient,
     DuckDuckGoSearchClient,
-    WebEvidence,
     _DuckDuckGoParser,
 )
 from knowledgeos.types import SourceKind
-
 
 SAMPLE_DDG_HTML = """
 <!DOCTYPE html>

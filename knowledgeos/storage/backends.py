@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from threading import Lock
 import time
+from threading import Lock
 from typing import Any
 
 from ..types import TraceEvent

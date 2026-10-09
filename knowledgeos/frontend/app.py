@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import asdict
-from pathlib import Path
 import sys
 import time
+from pathlib import Path
 
 if __package__ in {None, ""}:  # pragma: no cover
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -17,7 +16,7 @@ from knowledgeos.analytics.service import AnalyticsService
 from knowledgeos.config import settings
 from knowledgeos.ingestion.pipeline import IngestionPipeline
 from knowledgeos.orchestration.supervisor import KnowledgeOSOrchestrator
-from knowledgeos.types import QueryIntent, ResearchRequest, SourceKind
+from knowledgeos.types import QueryIntent, ResearchRequest
 
 # Streamlit Page Config
 st.set_page_config(
@@ -298,7 +297,7 @@ with tab3:
                     st.write(f"**Session:** {m.session_id}")
                     st.write(f"**Importance:** {m.importance}")
                     st.write(f"**Payload:** {m.payload}")
-                    if st.button(f"🗑️ Delete Memory", key=f"del_mem_{m.id}"):
+                    if st.button("🗑️ Delete Memory", key=f"del_mem_{m.id}"):
                         orchestrator.memory_store.delete_memory(m.id)
                         st.rerun()
         else:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..evaluation.evaluator import Evaluator
-from ..types import AgentOutcome, AgentStatus, ResearchState
+from ..types import AgentOutcome, ResearchState
 from .base import BaseAgent
 
 

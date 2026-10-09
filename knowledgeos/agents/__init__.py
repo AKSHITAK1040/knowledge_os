@@ -1,11 +1,11 @@
+from .academic_research import AcademicResearchAgent
 from .base import AgentContext, BaseAgent
+from .evaluation import EvaluationAgent
+from .memory import MemoryAgent
 from .planner import PlannerAgent
 from .retrieval import RetrievalAgent
-from .web_research import WebResearchAgent
-from .academic_research import AcademicResearchAgent
-from .memory import MemoryAgent
-from .evaluation import EvaluationAgent
 from .synthesis import SynthesisAgent
+from .web_research import WebResearchAgent
 
 __all__ = [
     "AgentContext",

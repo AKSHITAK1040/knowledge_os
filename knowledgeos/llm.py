@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-import json
 import os
 import re
+from abc import ABC, abstractmethod
 from typing import Any, Sequence
 
 from .config import settings
 from .types import QueryIntent
-from .utils import deterministic_embedding, extract_claims, tokenize
+from .utils import deterministic_embedding
 
 
 class LLMClient(ABC):
@@ -80,7 +79,7 @@ class DeterministicLLMClient(LLMClient, EmbeddingClient):
         if task == "synthesis":
             query_match = re.search(r"Query:\s*(.+?)(?=\nIntent:|\nPlan:|\nEvidence:|$)", prompt, re.DOTALL)
             query = query_match.group(1).strip() if query_match else "Research Request"
-            
+
             evidence_section = ""
             if "Evidence:" in prompt:
                 evidence_section = prompt.split("Evidence:")[1].split("Memory:")[0].strip()

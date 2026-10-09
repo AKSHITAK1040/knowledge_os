@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+
 from fastapi.testclient import TestClient
 
 from knowledgeos.api.app import app
@@ -17,6 +18,11 @@ class APITests(unittest.TestCase):
         data = res.json()
         self.assertEqual(data["status"], "ok")
         self.assertIn("stats", data)
+
+        # Unauthenticated probe (container health check, Kubernetes liveness probe)
+        unauth_res = self.client.get("/health")
+        self.assertEqual(unauth_res.status_code, 200)
+        self.assertEqual(unauth_res.json()["status"], "ok")
 
     def test_chat_endpoint(self) -> None:
         res = self.client.post(
@@ -73,12 +79,12 @@ class APITests(unittest.TestCase):
         self.assertIn("items", traces_res.json())
 
     def test_auth_rejection(self) -> None:
-        # Missing auth header should be rejected
-        res = self.client.get("/health")
+        # Missing auth header should be rejected on protected endpoints
+        res = self.client.get("/v1/info")
         self.assertEqual(res.status_code, 401)
 
         # Invalid key should be rejected
-        res_bad = self.client.get("/health", headers={"x-api-key": "wrong-key"})
+        res_bad = self.client.get("/v1/info", headers={"x-api-key": "wrong-key"})
         self.assertEqual(res_bad.status_code, 401)
 
     def test_system_info_endpoint(self) -> None:

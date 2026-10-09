@@ -33,7 +33,7 @@ class StorageTests(unittest.TestCase):
             self.assertEqual(len(store.list_metrics()), 1)
             self.assertEqual(len(store.list_memories()), 1)
             self.assertEqual(store.count_chunks(), 1)
-            
+
             stats = store.stats()
             self.assertEqual(stats["traces"], 1)
             self.assertEqual(stats["chunks"], 1)

@@ -27,7 +27,7 @@ class GraphState(TypedDict):
 
 def build_langgraph(orchestrator: KnowledgeOSOrchestrator):
     """Build an executable LangGraph-compatible research StateGraph.
-    
+
     Provides a visual, compiled LangGraph execution graph for teams integrating
     with LangGraph Studio or LangSmith.
     """

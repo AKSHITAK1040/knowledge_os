@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import statistics
 import time
-from typing import Any
-import urllib.request
 import urllib.error
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any
 
 
 def send_request(base_url: str, api_key: str, query: str) -> dict[str, Any]:

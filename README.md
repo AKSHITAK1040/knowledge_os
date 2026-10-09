@@ -2,6 +2,8 @@
 
 **KnowledgeOS** is a state-of-the-art, production-grade multi-agent research and knowledge intelligence platform. Built with a supervisor-driven multi-agent architecture, dynamic intent routing, hybrid Reciprocal Rank Fusion (RRF) retrieval, hierarchical episodic memory, RAG Triad evaluation guardrails, and enterprise FastAPI & Streamlit interfaces.
 
+> 💡 **For Reviewers & Interview Panels:** Check out the complete [Technical Reviewer & System Presentation Guide](file:///d:/KnowledgeOS/docs/reviewer_walkthrough_guide.md) for the 30-second executive pitch, 5-minute live demo script, architectural tradeoffs, and deep-dive technical Q&A.
+
 ---
 
 ## 🚀 Key Features
@@ -51,9 +53,10 @@
 
 ## 🛠️ Quick Start
 
-### 1. Install Dependencies
+### 1. Install Dependencies & Configure Environment
 ```bash
 pip install -e .[dev]
+cp .env.example .env
 ```
 
 ### 2. Run the FastAPI Backend
@@ -62,6 +65,7 @@ uvicorn knowledgeos.api.app:app --reload --port 8000
 ```
 - **Interactive Swagger Docs:** [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
 - **ReDoc:** [http://127.0.0.1:8000/redoc](http://127.0.0.1:8000/redoc)
+- **Health Check:** [http://127.0.0.1:8000/health](http://127.0.0.1:8000/health)
 
 ### 3. Run the Streamlit Dashboard
 ```bash
@@ -69,28 +73,35 @@ streamlit run knowledgeos/frontend/app.py
 ```
 - **Dashboard UI:** [http://localhost:8501](http://localhost:8501)
 
-### 4. Run Test Suite & Benchmarks
+### 4. Run Verification, Tests & Benchmarks
 ```bash
+# 1. Run Complete Test Suite (30/30 passed)
 pytest -v
+
+# 2. Run RAG Triad Benchmarks
 python benchmarks/run_benchmarks.py
+
+# 3. Run Concurrency & HTTP Load Test
+python benchmarks/load_test.py
+
+# 4. Code Quality & Linting
+ruff check .
 ```
 
 ---
 
 ## 🔌 LLM & Provider Configuration
 
-KnowledgeOS is configured with **Groq Cloud API** as its primary, ultra-fast LLM engine, with fallback chains to offline deterministic engines:
+KnowledgeOS is configured with **Groq Cloud API** as its primary, ultra-fast LLM engine, with transparent fallback chains to deterministic offline engines:
 
 ```env
 GROQ_API_KEY=your-groq-api-key
 GROQ_MODEL=openai/gpt-oss-120b
 GROQ_BASE_URL=https://api.groq.com/openai/v1
 
-# Optional alternatives
-OPENAI_API_KEY=your-openai-key
-ANTHROPIC_API_KEY=your-anthropic-key
-VOYAGE_API_KEY=your-voyage-key
+# Security & Core Settings
 KNOWLEDGEOS_API_KEY=dev-key
+KNOWLEDGEOS_ENV=development
 ```
 
 ---
@@ -105,3 +116,17 @@ KNOWLEDGEOS_API_KEY=dev-key
 | **Execution Latency** | **~82 ms** (Ultra-fast) |
 | **Overall Confidence** | **72.4% (0.72)** |
 | **Test Suite Pass Rate** | **100% (30/30 passed)** |
+
+---
+
+## 📚 Documentation Index
+
+- [Technical Reviewer & System Presentation Guide](file:///d:/KnowledgeOS/docs/reviewer_walkthrough_guide.md)
+- [System Architecture](file:///d:/KnowledgeOS/docs/architecture.md)
+- [REST API Specification](file:///d:/KnowledgeOS/docs/api.md)
+- [Database & Vector Storage Schema](file:///d:/KnowledgeOS/docs/schema.md)
+- [Sequence Diagram](file:///d:/KnowledgeOS/docs/sequence.md)
+- [Observability & OpenMetrics Telemetry](file:///d:/KnowledgeOS/docs/observability.md)
+- [Design Decisions & Tradeoffs](file:///d:/KnowledgeOS/docs/design-decisions.md)
+- [Production Deployment Guide](file:///d:/KnowledgeOS/docs/deployment.md)
+

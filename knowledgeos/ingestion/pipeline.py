@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 import csv
+import json
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
-import io
-import json
 from pathlib import Path
 from typing import Any, Sequence
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from ..retrieval.hybrid import HybridRetriever
-from ..types import KnowledgeChunk, SourceKind
-from ..utils import chunk_text, merge_metadata, stable_hash
+from ..types import SourceKind
+from ..utils import chunk_text, merge_metadata
 
 
 class _HTMLTextExtractor(HTMLParser):
@@ -253,8 +252,9 @@ class IngestionPipeline:
     def _read_docx_bytes(self, data: bytes) -> str:
         """Extract text from DOCX bytes without writing to disk."""
         try:
-            from docx import Document
             import io as _io
+
+            from docx import Document
 
             doc = Document(_io.BytesIO(data))
             return "\n\n".join(p.text for p in doc.paragraphs if p.text.strip())

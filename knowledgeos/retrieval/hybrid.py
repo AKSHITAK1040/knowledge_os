@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import time
-from typing import Any, Iterable, Sequence
+from dataclasses import dataclass, field
+from typing import Any, Iterable
 
 from ..llm import EmbeddingClient
 from ..storage.backends import RedisCacheBackend

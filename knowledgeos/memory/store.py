@@ -1,12 +1,19 @@
 from __future__ import annotations
 
-from collections import defaultdict
 import time
+from collections import defaultdict
 from typing import Any, Iterable
 
 from ..llm import EmbeddingClient
 from ..types import MemoryItem
-from ..utils import cosine_similarity, deterministic_embedding, memory_decay_score, stable_hash, summarize_text, tokenize
+from ..utils import (
+    cosine_similarity,
+    deterministic_embedding,
+    memory_decay_score,
+    stable_hash,
+    summarize_text,
+    tokenize,
+)
 
 
 class SessionMemoryStore:

@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from collections import Counter, defaultdict
-from dataclasses import asdict
 import hashlib
 import math
 import re
 import time
+from collections import Counter, defaultdict
 from typing import Any, Iterable, Sequence
 
-from .types import Citation, KnowledgeChunk, MemoryItem
+from .types import Citation, MemoryItem
 
 TOKEN_RE = re.compile(r"[A-Za-z0-9_\u00C0-\u017F]+")
 SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9])")
@@ -69,7 +68,7 @@ def cosine_similarity(left: Sequence[float], right: Sequence[float]) -> float:
 
 def reciprocal_rank_fusion(ranked_lists: list[list[str]], k: int = 60) -> dict[str, float]:
     """Compute Reciprocal Rank Fusion (RRF) scores across multiple ranked lists.
-    
+
     RRF(d) = sum(1 / (k + rank(d)))
     """
     scores: dict[str, float] = defaultdict(float)
@@ -83,7 +82,7 @@ def chunk_text(text: str, max_tokens: int = 180, overlap: int = 30) -> list[str]
     """Chunk text respecting sentence boundaries and token limits."""
     if not text or not text.strip():
         return []
-    
+
     # Check if text contains markdown headers
     sections = [s.strip() for s in MARKDOWN_HEADER_RE.split(text) if s.strip()]
     if len(sections) > 1:
