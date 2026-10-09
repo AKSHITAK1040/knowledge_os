@@ -103,25 +103,35 @@ class DeterministicLLMClient(LLMClient, EmbeddingClient):
                     f"*Note: No citations were available, so this answer should be treated as provisional.*"
                 )
 
-            summary_parts = []
             findings_parts = []
-            synthesis_parts = []
-
             for idx, (title, excerpt) in enumerate(evidence_items[:5], start=1):
                 clean_excerpt = excerpt.strip(" .")
-                summary_parts.append(f"In addressing {query}, evidence from **{title}** [{idx}] verifies that {clean_excerpt}.")
                 findings_parts.append(f"- **{title}** [{idx}]: {clean_excerpt}.")
 
-            if evidence_items:
-                primary_title, primary_excerpt = evidence_items[0]
-                synthesis_parts.append(
-                    f"Strategic analysis indicates that {primary_excerpt.strip(' .')}, supported by validated findings from **{primary_title}** [1] for {query}."
+            titles = list(dict.fromkeys(t for t, _ in evidence_items))
+            primary_title, primary_excerpt = evidence_items[0]
+            clean_first = primary_excerpt.strip(" .")
+
+            if len(titles) == 1:
+                summary_text = (
+                    f"Evidence extracted from **{primary_title}** directly resolves this inquiry. "
+                    f"Specifically, the document establishes that {clean_first} [1]. "
+                    f"Subsequent sections provide granular parameters, operational constraints, and implementation specifics."
+                )
+            else:
+                titles_str = ", ".join(f"**{t}**" for t in titles[:3])
+                summary_text = (
+                    f"Multi-source intelligence retrieved from {titles_str} provides comprehensive coverage. "
+                    f"Primary findings from **{primary_title}** confirm that {clean_first} [1], "
+                    f"with corroborating evidence providing further domain context and technical verification."
                 )
 
-            summary_text = " ".join(summary_parts) if summary_parts else f"Analysis of **{query}** synthesized from retrieved sources."
-            findings_text = "\n".join(findings_parts)
-            synthesis_text = " ".join(synthesis_parts) if synthesis_parts else f"The retrieved evidence provides validated grounding for {query}."
+            synthesis_text = (
+                "The verified evidence substantiates core requirements, execution criteria, and documented constraints. "
+                "All substantive claims are mapped to inspectable citation anchors across the knowledge repository."
+            )
 
+            findings_text = "\n".join(findings_parts)
             answer = (
                 f"### Executive Summary\n"
                 f"{summary_text}\n\n"
@@ -176,10 +186,8 @@ class GroqAdapter(LLMClient, EmbeddingClient):
         candidate_models = [
             self.model,
             "openai/gpt-oss-120b",
-            "llama-3.3-70b-versatile",
-            "qwen/qwen3.8-27b",
             "openai/gpt-oss-20b",
-            "llama-3.1-8b-instant",
+            "qwen/qwen3.8-27b",
         ]
         seen_models = set()
 
