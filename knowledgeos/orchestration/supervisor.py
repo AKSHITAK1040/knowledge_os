@@ -153,7 +153,7 @@ class KnowledgeOSOrchestrator:
         # Deduplicate citations and evidence, sorted by score descending
         state.citations = dedupe_citations(state.citations)
         state.citations.sort(key=lambda c: c.score, reverse=True)
-        max_citations = max(request.top_k, 8)
+        max_citations = max(request.top_k, 12 if (request.include_web or request.include_academic) else 8)
         state.citations = state.citations[:max_citations]
         state.evidence = list(state.citations)
 

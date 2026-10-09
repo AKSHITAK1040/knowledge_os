@@ -17,13 +17,14 @@ class WebEvidence:
     excerpt: str
     source_kind: SourceKind = SourceKind.WEB
 
-    def to_citation(self) -> Citation:
+    def to_citation(self, score: float = 0.85) -> Citation:
         return Citation(
             source_id=stable_hash(self.url),
             title=self.title,
             url=self.url,
             excerpt=self.excerpt,
             source_kind=self.source_kind,
+            score=score,
         )
 
 

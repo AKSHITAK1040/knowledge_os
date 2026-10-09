@@ -18,7 +18,7 @@ class WebResearchAgent(BaseAgent):
         except Exception as exc:
             self.trace(state, "web_research_failed", "Web research failed", metadata={"error": str(exc)})
             return self.outcome(state, status=AgentStatus.FAILED, confidence=0.1, message="Web research failed", error=str(exc))
-        citations = [result.to_citation() for result in results]
+        citations = [result.to_citation(score=round(max(0.60, 0.85 - idx * 0.03), 2)) for idx, result in enumerate(results)]
         self.trace(state, "web_research_complete", f"Web research completed with {len(citations)} citations", metadata={"results": len(results)})
         return self.outcome(
             state,
